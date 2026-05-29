@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1976d2">
+    <title>基金实时估值</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+            color: white;
+            padding: 12px 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            font-weight: 500;
+        }
+        
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .container {
+            padding: 10px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .add-fund {
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .add-fund input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .add-fund input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .add-fund button {
+            width: 100%;
+            padding: 10px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        
+        .search-dropdown {
+            position: absolute;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            width: calc(100% - 24px);
+            margin-top: 4px;
+        }
+        
+        .search-dropdown-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .search-dropdown-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+        
+        .search-dropdown-item-code {
+            color: #1976d2;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .search-dropdown-item-name {
+            color: #666;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        
+        .update-time {
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+        }
+        
+        .fund-card {
+            background: white;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .fund-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .fund-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+            line-height: 1.3;
+        }
+        
+        .fund-code {
+            color: #999;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        .delete-btn {
+            background: #ff5252;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .fund-value {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .value-item {
+            text-align: center;
+        }
+        
+        .value-label {
+            color: #999;
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        
+        .value-num {
+            font-size: 17px;
+            font-weight: 600;
+        }
+        
+        .value-up {
+            color: #f44336;
+        }
+        
+        .value-down {
+            color: #4caf50;
+        }
+        
+        .value-flat {
+            color: #999;
+        }
+        
+        .fund-time {
+            text-align: right;
+            color: #999;
+            font-size: 10px;
+            margin-top: 6px;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .error {
+            color: #f44336;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="header-btn" id="configBtn" onclick="window.location.href='/config'" style="display:none;">⚙ 配置</button>
+        <h1>基金实时估值</h1>
+        <button class="header-btn" onclick="window.location.href='/logout'">退出</button>
+    </div>
+    
+    <div class="container">
+        <div class="update-time" id="updateTime" style="display:none;">
+            估值时间: <span id="timeText"></span>
+        </div>
+        <div class="add-fund" style="position: relative;">
+            <input type="text" id="fundCode" placeholder="输入基金代码或名称进行搜索" autocomplete="off">
+            <div class="search-dropdown" id="searchDropdown"></div>
+            <button onclick="addFund()">添加基金</button>
+        </div>
+        
+        <div id="fundList">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+    
+    <button class="refresh-btn" onclick="refreshAll()">↻</button>
+    
+    <script>
+        let funds = [];
+        let valuations = [];
+        let searchTimeout = null;
+        
+        async function checkAdmin() {
+            try {
+                const response = await fetch('/api/check-admin');
+                const data = await response.json();
+                if (data.is_admin) {
+                    document.getElementById('configBtn').style.display = 'block';
+                }
+            } catch (e) {
+                console.error('检查管理员状态失败');
+            }
+        }
+        
+        async function searchFunds(keyword) {
+            if (!keyword || keyword.length < 1) {
+                document.getElementById('searchDropdown').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/search?keyword=${encodeURIComponent(keyword)}`);
+                const data = await response.json();
+                
+                if (data.success && data.funds.length > 0) {
+                    renderSearchResults(data.funds);
+                } else {
+                    document.getElementById('searchDropdown').style.display = 'none';
+                }
+            } catch (e) {
+                console.error('搜索失败:', e);
+                document.getElementById('searchDropdown').style.display = 'none';
+            }
+        }
+        
+        function renderSearchResults(fundList) {
+            const dropdown = document.getElementById('searchDropdown');
+            dropdown.innerHTML = fundList.map(fund => `
+                <div class="search-dropdown-item" onclick="selectFund('${fund.code}', '${fund.name}')">
+                    <div class="search-dropdown-item-code">${fund.code}</div>
+                    <div class="search-dropdown-item-name">${fund.name}</div>
+                </div>
+            `).join('');
+            dropdown.style.display = 'block';
+        }
+        
+        function selectFund(code, name) {
+            document.getElementById('fundCode').value = code;
+            document.getElementById('searchDropdown').style.display = 'none';
+        }
+        
+        function closeSearchDropdown(e) {
+            if (!e.target.closest('.add-fund')) {
+                document.getElementById('searchDropdown').style.display = 'none';
+            }
+        }
+        
+        async function loadFunds() {
+            try {
+                const response = await fetch('/api/funds');
+                const data = await response.json();
+                funds = data.funds;
+                await loadValuations();
+            } catch (e) {
+                document.getElementById('fundList').innerHTML = 
+                    '<div class="error">加载失败，请检查网络</div>';
+            }
+        }
+        
+        async function loadValuations() {
+            try {
+                const response = await fetch('/api/valuation/all');
+                const data = await response.json();
+                valuations = data.valuations;
+                renderFunds();
+            } catch (e) {
+                renderFunds();
+            }
+        }
+        
+        function renderFunds() {
+            const container = document.getElementById('fundList');
+            const updateTimeDiv = document.getElementById('updateTime');
+            const timeText = document.getElementById('timeText');
+            
+            // 找到最新的估值时间
+            let latestTime = '';
+            for (const val of valuations) {
+                if (val && val.gztime) {
+                    latestTime = val.gztime;
+                    break;
+                }
+            }
+            
+            if (latestTime) {
+                updateTimeDiv.style.display = 'block';
+                timeText.textContent = latestTime;
+            } else {
+                updateTimeDiv.style.display = 'none';
+            }
+            
+            if (funds.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:40px;color:#999">暂无基金，请添加</div>';
+                return;
+            }
+            
+            container.innerHTML = funds.map(fund => {
+                const val = valuations.find(v => v.code === fund.code);
+                let changeClass = 'value-flat';
+                let changeStr = '0.00';
+                
+                if (val && val.gszzl !== null) {
+                    if (val.gszzl > 0) {
+                        changeClass = 'value-up';
+                        changeStr = '+' + val.gszzl.toFixed(2);
+                    } else if (val.gszzl < 0) {
+                        changeClass = 'value-down';
+                        changeStr = val.gszzl.toFixed(2);
+                    }
+                }
+                
+                return `
+                    <div class="fund-card">
+                        <div class="fund-header">
+                            <div>
+                                <div class="fund-name">${val ? val.name : fund.name}</div>
+                                <div class="fund-code">${fund.code}</div>
+                            </div>
+                            <button class="delete-btn" onclick="deleteFund('${fund.code}')">删除</button>
+                        </div>
+                        <div class="fund-value">
+                            <div class="value-item">
+                                <div class="value-label">估算净值</div>
+                                <div class="value-num">${val && val.gsz !== null ? val.gsz : '--'}</div>
+                            </div>
+                            <div class="value-item">
+                                <div class="value-label">估算涨跌</div>
+                                <div class="value-num ${changeClass}">${changeStr}%</div>
+                            </div>
+                            <div class="value-item">
+                                <div class="value-label">昨日净值</div>
+                                <div class="value-num">${val && val.dwjz !== null ? val.dwjz : '--'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function addFund() {
+            const code = document.getElementById('fundCode').value.trim();
+            if (!code) {
+                alert('请输入基金代码');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/funds', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({code: code})
+                });
+                
+                if (response.ok) {
+                    document.getElementById('fundCode').value = '';
+                    await loadFunds();
+                } else {
+                    const data = await response.json();
+                    alert(data.message || '添加失败');
+                }
+            } catch (e) {
+                alert('添加失败，请检查网络');
+            }
+        }
+        
+        async function deleteFund(code) {
+            if (!confirm('确定要删除这个基金吗？')) return;
+            
+            try {
+                await fetch(`/api/funds/${code}`, {method: 'DELETE'});
+                await loadFunds();
+            } catch (e) {
+                alert('删除失败');
+            }
+        }
+        
+        function refreshAll() {
+            loadValuations();
+        }
+        
+        // 搜索功能
+        document.getElementById('fundCode').addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchFunds(e.target.value);
+            }, 300);
+        });
+        
+        document.getElementById('fundCode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('searchDropdown').style.display = 'none';
+                addFund();
+            }
+        });
+        
+        document.addEventListener('click', closeSearchDropdown);
+        
+        // 检查是否是管理员
+        checkAdmin();
+        loadFunds();
+    </script>
+</body>
+</html>

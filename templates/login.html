@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 基金实时估值</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: url('/static/login-bg.png') center/cover no-repeat;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 0;
+        }
+        
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .login-box h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+        
+        .login-link a {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .remember-group {
+            margin-bottom: 24px;
+        }
+        
+        .remember-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .remember-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        
+        .remember-label span {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h1>天赐良基-实时估值</h1>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group remember-group">
+                <label class="remember-label">
+                    <input type="checkbox" id="rememberMe" checked>
+                    <span>记住登录状态（30天）</span>
+                </label>
+            </div>
+            <button type="submit" class="login-btn">登录</button>
+        </form>
+        <div class="login-link">
+            没有账号？<a href="/register">立即注册</a>
+        </div>
+    </div>
+    
+    <script>
+        // 页面加载时尝试读取保存的用户名
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedUsername = localStorage.getItem('fundUsername');
+            const savedRemember = localStorage.getItem('fundRememberMe');
+            
+            if (savedUsername) {
+                document.getElementById('username').value = savedUsername;
+            }
+            
+            if (savedRemember === 'false') {
+                document.getElementById('rememberMe').checked = false;
+            }
+            
+            // 监听表单提交，保存用户名
+            document.querySelector('form').addEventListener('submit', function() {
+                const rememberMe = document.getElementById('rememberMe').checked;
+                const username = document.getElementById('username').value;
+                
+                if (rememberMe && username) {
+                    localStorage.setItem('fundUsername', username);
+                    localStorage.setItem('fundRememberMe', 'true');
+                } else {
+                    localStorage.removeItem('fundUsername');
+                    localStorage.setItem('fundRememberMe', 'false');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
