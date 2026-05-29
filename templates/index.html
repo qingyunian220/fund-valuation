@@ -215,6 +215,35 @@
             margin-top: 6px;
         }
         
+        .streak-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .streak-up {
+            background-color: #ffebee;
+            color: #f44336;
+        }
+        
+        .streak-down {
+            background-color: #e8f5e9;
+            color: #4caf50;
+        }
+        
+        .drawdown-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            background-color: #fff3e0;
+            color: #ff9800;
+            margin-left: 4px;
+        }
+        
         .refresh-btn {
             position: fixed;
             bottom: 24px;
@@ -380,6 +409,7 @@
                 const val = valuations.find(v => v.code === fund.code);
                 let changeClass = 'value-flat';
                 let changeStr = '0.00';
+                let streakHtml = '';
                 
                 if (val && val.gszzl !== null) {
                     if (val.gszzl > 0) {
@@ -391,11 +421,23 @@
                     }
                 }
                 
+                let drawdownHtml = '';
+                if (val && val.drawdown !== null && val.drawdown < -8) {
+                    const drawdownText = `回撤${Math.abs(val.drawdown).toFixed(1)}%`;
+                    drawdownHtml = `<span class="drawdown-badge" title="历史高点: ${val.high_value} (${val.high_date})">${drawdownText}</span>`;
+                }
+                
+                if (val && val.streak_days && val.streak_days > 1) {
+                    const streakClass = val.streak_type === 'up' ? 'streak-up' : 'streak-down';
+                    const streakText = val.streak_type === 'up' ? '连涨' : '连跌';
+                    streakHtml = `<span class="streak-badge ${streakClass}">${streakText}${val.streak_days}天</span>`;
+                }
+                
                 return `
                     <div class="fund-card">
                         <div class="fund-header">
                             <div>
-                                <div class="fund-name">${val ? val.name : fund.name}</div>
+                                <div class="fund-name">${val ? val.name : fund.name} ${streakHtml} ${drawdownHtml}</div>
                                 <div class="fund-code">${fund.code}</div>
                             </div>
                             <button class="delete-btn" onclick="deleteFund('${fund.code}')">删除</button>

@@ -10,6 +10,8 @@ import re
 import json
 import time
 from typing import Optional, Dict, Any, List
+from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
 
 class FundValuationFetcher:
@@ -20,6 +22,9 @@ class FundValuationFetcher:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
+        # 添加历史数据缓存，缓存有效期为3600秒（1小时）
+        self.history_cache = {}
+        self.cache_duration = 3600
 
     def fetch_fundgz(self, fund_code: str) -> Optional[Dict[str, Any]]:
         """
@@ -175,6 +180,193 @@ class FundValuationFetcher:
             return self.fetch_sina_estimate(fund_code, data_source)
         else:
             return self.fetch_fundgz(fund_code)
+    
+    def fetch_history(self, fund_code: str, count: int = 30) -> Optional[List[Dict[str, Any]]]:
+        """
+        获取基金历史净值数据
+        
+        Args:
+            fund_code: 基金代码
+            count: 获取的天数
+            
+        Returns:
+            历史净值列表，按日期倒序排列（最新的在前）
+        """
+        # 计算缓存键（只计算一次）
+        cache_key = f"{fund_code}_{count}"
+        
+        # 检查缓存
+        if cache_key in self.history_cache:
+            cached_data, cache_time = self.history_cache[cache_key]
+            if (datetime.now() - cache_time).total_seconds() < self.cache_duration:
+                return cached_data
+        
+        url = f"https://fund.eastmoney.com/f10/F10DataApi.aspx?type=lsjz&code={fund_code}&page=1&per={count}&sdate=&edate=&rt={time.time()}"
+        
+        try:
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            
+            # 解析返回的数据
+            text = response.text
+            # 提取 content 部分
+            content_match = re.search(r'content:"(.*?)"', text, re.DOTALL)
+            if not content_match:
+                return None
+            
+            html_content = content_match.group(1)
+            # 替换转义字符
+            html_content = html_content.replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"').replace('&amp;', '&')
+            
+            # 使用 BeautifulSoup 解析 HTML
+            soup = BeautifulSoup(html_content, 'html.parser')
+            table = soup.find('table', class_='lsjz')
+            if not table:
+                return None
+            
+            history_data = []
+            rows = table.find('tbody').find_all('tr')
+            
+            for row in rows:
+                cols = row.find_all('td')
+                if len(cols) >= 4:
+                    date = cols[0].text.strip()
+                    net_value = cols[1].text.strip()
+                    # 提取增长率
+                    growth_text = cols[3].text.strip()
+                    # 移除百分号
+                    growth = None
+                    if growth_text and growth_text != '--':
+                        growth = float(growth_text.replace('%', ''))
+                    
+                    history_data.append({
+                        'date': date,
+                        'net_value': net_value,
+                        'growth': growth
+                    })
+            
+            # 存储到缓存（使用已计算的缓存键）
+            self.history_cache[cache_key] = (history_data, datetime.now())
+            
+            return history_data
+        except Exception as e:
+            print(f"获取历史净值失败: {e}")
+            return None
+    
+    def calculate_streak(self, history_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        计算连涨/连跌天数
+        
+        Args:
+            history_data: 历史净值数据，按日期倒序排列
+            
+        Returns:
+            包含连涨/连跌天数的字典
+        """
+        if not history_data or len(history_data) < 2:
+            return {'streak_type': None, 'streak_days': 0}
+        
+        # 获取最近的涨跌趋势
+        # 注意：history_data 是倒序排列，第一个是最新日期
+        # 计算连涨/连跌
+        streak_days = 0
+        streak_type = None  # 'up' 或 'down'
+        
+        # 第一步：找到第一个非零增长率来确定方向
+        found_start = False
+        for i in range(len(history_data)):
+            current = history_data[i]
+            growth = current.get('growth')
+            
+            if growth is None:
+                break
+            
+            if growth > 0:
+                streak_type = 'up'
+                streak_days = 1
+                found_start = True
+                # 从下一个位置开始继续计算
+                start_index = i + 1
+                break
+            elif growth < 0:
+                streak_type = 'down'
+                streak_days = 1
+                found_start = True
+                # 从下一个位置开始继续计算
+                start_index = i + 1
+                break
+            # 增长率为0，继续找
+        
+        # 如果没有找到非零增长率，直接返回
+        if not found_start:
+            return {'streak_type': None, 'streak_days': 0}
+        
+        # 第二步：从找到方向的位置继续计算连续天数
+        for i in range(start_index, len(history_data)):
+            current = history_data[i]
+            growth = current.get('growth')
+            
+            if growth is None:
+                # 增长率为None，跳过继续
+                continue
+            
+            # 检查是否和前一天同方向
+            if (streak_type == 'up' and growth > 0) or (streak_type == 'down' and growth < 0):
+                streak_days += 1
+            elif (streak_type == 'up' and growth < 0) or (streak_type == 'down' and growth > 0):
+                # 方向改变，停止
+                break
+            # 平，继续（不算入连涨连跌天数）
+        
+        return {
+            'streak_type': streak_type,
+            'streak_days': streak_days
+        }
+    
+    def calculate_drawdown(self, history_data: List[Dict[str, Any]], current_value: any) -> Dict[str, Any]:
+        """
+        计算相对于历史高点的回撤
+        
+        Args:
+            history_data: 历史净值数据，按日期倒序排列
+            current_value: 当前实时估值（可能是字符串或数字）
+            
+        Returns:
+            包含历史高点和回撤信息的字典
+        """
+        if not history_data or len(history_data) < 1 or current_value is None:
+            return {'high_value': None, 'drawdown': None, 'high_date': None}
+        
+        # 类型转换处理 current_value
+        try:
+            current_value = float(current_value)
+        except (ValueError, TypeError):
+            return {'high_value': None, 'drawdown': None, 'high_date': None}
+        
+        # 找到历史高点
+        high_value = None
+        high_date = None
+        
+        for item in history_data:
+            try:
+                net_value = float(item.get('net_value', 0))
+                if net_value > 0:
+                    if high_value is None or net_value > high_value:
+                        high_value = net_value
+                        high_date = item.get('date')
+            except (ValueError, TypeError):
+                continue
+        
+        # 计算回撤
+        drawdown = None
+        if high_value and high_value > 0:
+            drawdown = ((current_value - high_value) / high_value) * 100
+        
+        return {
+            'high_value': high_value,
+            'drawdown': drawdown,
+            'high_date': high_date
+        }
     
     def search_funds(self, keyword: str) -> List[Dict[str, Any]]:
         """

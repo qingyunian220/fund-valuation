@@ -11,6 +11,7 @@ import json
 import os
 from datetime import timedelta
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -222,6 +223,33 @@ def get_valuation(code):
     else:
         return jsonify({'success': False, 'message': '获取估值失败'}), 400
 
+def get_fund_data(fund):
+    """获取单个基金的数据（用于多线程）"""
+    data = fetcher.fetch_valuation(fund['code'], 1)
+    if data:
+        # 获取足够多的历史数据（365天）用于计算历史高点
+        history_full = fetcher.fetch_history(fund['code'], 365)
+        if history_full:
+            # 计算连涨连跌时只使用最近30天的数据
+            history_recent = history_full[:30]
+            streak = fetcher.calculate_streak(history_recent)
+            data['streak_type'] = streak['streak_type']
+            data['streak_days'] = streak['streak_days']
+            # 计算高点回撤时使用完整历史数据
+            drawdown = fetcher.calculate_drawdown(history_full, data.get('gsz'))
+            data['high_value'] = drawdown['high_value']
+            data['drawdown'] = drawdown['drawdown']
+            data['high_date'] = drawdown['high_date']
+        else:
+            data['streak_type'] = None
+            data['streak_days'] = 0
+            data['high_value'] = None
+            data['drawdown'] = None
+            data['high_date'] = None
+        return data
+    return None
+
+
 @app.route('/api/valuation/all', methods=['GET'])
 @login_required
 def get_all_valuations():
@@ -231,10 +259,20 @@ def get_all_valuations():
     user_funds = funds_data.get(username, [])
     results = []
     
-    for fund in user_funds:
-        data = fetcher.fetch_valuation(fund['code'], 1)
-        if data:
-            results.append(data)
+    # 使用多线程并行处理多个基金
+    max_workers = min(10, len(user_funds)) if len(user_funds) > 0 else 1
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 提交所有任务
+        future_to_fund = {executor.submit(get_fund_data, fund): fund for fund in user_funds}
+        
+        # 收集结果
+        for future in as_completed(future_to_fund):
+            try:
+                data = future.result()
+                if data:
+                    results.append(data)
+            except Exception as e:
+                print(f"处理基金数据时出错: {e}")
     
     return jsonify({'success': True, 'valuations': results})
 
