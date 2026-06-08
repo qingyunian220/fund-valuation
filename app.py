@@ -16,7 +16,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 app = Flask(__name__)
 app.secret_key = b'\x1a\x8c\x0f\xd2\x11\x8f\x1e\x8f\x1a\x8c\x0f\xd2\x11\x8f\x1e\x8f\x1a\x8c\x0f\xd2\x11\x8f\x1e\x8f'
 app.permanent_session_lifetime = timedelta(days=30)  # 30 天登录有效期
-CORS(app)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_NAME'] = 'fund_session'
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+CORS(app, supports_credentials=True)
 
 fetcher = FundValuationFetcher()
 
